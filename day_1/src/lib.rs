@@ -1,69 +1,53 @@
-use std::collections::HashMap;
-use std::fs::read_to_string;
 use regex::Regex;
+use std::fs::read_to_string;
 
-pub fn solve_first() -> u32 {
-    let file = read_to_string("input").unwrap();
-    let mut sum = 0;
-    let re = Regex::new(r"[a-zA-A]").unwrap();
-    for line in file.lines() {
-        let numbers = re.replace_all(line, "");
-        if numbers.is_empty() {
-            continue;
-        }
-        let first_number = numbers.chars().next().unwrap().to_digit(10).unwrap();
-        let last_number = numbers.chars().last().unwrap().to_digit(10).unwrap();
-        sum += first_number * 10 + last_number;
-    }
-    sum
+fn solve_first() -> Result<u32, Errors> {
+    solve(|line| line.to_string())
 }
 
-pub fn solve_second() -> u32 {
-    let file = read_to_string("input").unwrap();
-    let mut sum = 0;
-    let re = Regex::new(r"[a-zA-A]").unwrap();
-    let mut numbers = HashMap::new();
-    numbers.insert("one", "1");
-    numbers.insert("two", "2");
-    numbers.insert("three", "3");
-    numbers.insert("four", "4");
-    numbers.insert("five", "5");
-    numbers.insert("six", "6");
-    numbers.insert("seven", "7");
-    numbers.insert("eight", "8");
-    numbers.insert("nine", "9");
-    for line in file.lines() {
-        let mut buffer = String::new();
-        let mut replaced = line.to_string();
-        for char in line.chars() {
-            buffer.push(char);
-            if numbers.contains_key(buffer.as_str()) {
-                replaced = replaced.replace(buffer.as_str(), format!("{}{}", numbers.get(buffer.as_str()).unwrap(), buffer.chars().last().unwrap()).as_str());
-                buffer.clear();
-                buffer.push(char);
-                continue;
-            }
+fn solve_second() -> Result<u32, Errors> {
+    solve(|line| {
+        line.replace("one", "o1e")
+            .replace("two", "t2o")
+            .replace("three", "t3e")
+            .replace("four", "f4r")
+            .replace("five", "f5e")
+            .replace("six", "s6x")
+            .replace("seven", "s7n")
+            .replace("eight", "e8t")
+            .replace("nine", "n9e")
+    })
+}
 
-            for (key, value) in numbers.iter() {
-                if buffer.contains(key) {
-                    replaced = replaced.replace(buffer.as_str(), format!("{}{}", buffer.replace(key, value).as_str(), key.chars().last().unwrap()).as_str());
-                    buffer.clear();
-                    buffer.push(key.chars().last().unwrap());
-                    continue;
-                }
-            }
-        }
+fn solve<F>(transform: F) -> Result<u32, Errors>
+where
+    F: Fn(&str) -> String,
+{
+    let file = read_to_string("input").map_err(|_| Errors::FileError)?;
+    let re = Regex::new(r"[a-zA-A]").map_err(|_| Errors::RegexError)?;
+    Ok(file
+        .lines()
+        .into_iter()
+        .map(|line| transform(line))
+        .map(|line| re.replace_all(&line, "").to_string())
+        .flat_map(|line| parse_digits(line))
+        .map(|digits| digits.0 * 10 + digits.1)
+        .sum::<u32>())
+}
 
-        let numbers = re.replace_all(&replaced, "");
-        if numbers.is_empty() {
-            continue;
-        }
-        let first_number = numbers.chars().next().unwrap().to_digit(10).unwrap();
-        let last_number = numbers.chars().last().unwrap().to_digit(10).unwrap();
-        sum += first_number * 10 + last_number;
+fn parse_digits(line: String) -> Result<(u32, u32), Errors> {
+    let numbers: Vec<u32> = line.chars().flat_map(|c| c.to_digit(10)).collect();
+    match (numbers.first(), numbers.last()) {
+        (Some(first), Some(last)) => Ok((*first, *last)),
+        _ => Err(Errors::NoDigitFound),
     }
+}
 
-    sum
+#[derive(Debug)]
+enum Errors {
+    NoDigitFound,
+    FileError,
+    RegexError,
 }
 
 #[cfg(test)]
@@ -73,12 +57,18 @@ mod tests {
     #[test]
     fn solve_1() {
         let result = solve_first();
-        assert_eq!(result, 55108);
+        match result {
+            Err(e) => panic!("{:?}", e),
+            Ok(result) => assert_eq!(result, 55108),
+        }
     }
 
     #[test]
     fn solve_2() {
         let result = solve_second();
-        assert_eq!(result, 56324);
+        match result {
+            Err(e) => panic!("{:?}", e),
+            Ok(result) => assert_eq!(result, 56324),
+        }
     }
 }
