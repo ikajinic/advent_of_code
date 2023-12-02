@@ -1,6 +1,7 @@
+use std::error::Error;
 use std::fs::read_to_string;
 
-fn solve_first() -> Result<u32, Errors> {
+fn solve_first() -> Result<u32, Box<dyn Error>> {
     solve(|(id, games)| {
         if games
             .iter()
@@ -13,7 +14,7 @@ fn solve_first() -> Result<u32, Errors> {
     })
 }
 
-fn solve_second() -> Result<u32, Errors> {
+fn solve_second() -> Result<u32, Box<dyn Error>> {
     solve(|(_, games)| {
         match (
             games.iter().map(|pull| pull.red).max(),
@@ -26,26 +27,26 @@ fn solve_second() -> Result<u32, Errors> {
     })
 }
 
-fn solve<F>(transform: F) -> Result<u32, Errors>
+fn solve<F>(transform: F) -> Result<u32, Box<dyn Error>>
 where
     F: Fn((u32, Vec<Pull>)) -> u32,
 {
-    let file = read_to_string("input").map_err(|_| Errors::FileError)?;
+    let file = read_to_string("input")?;
 
     Ok(file
         .lines()
-        .into_iter()
         .map(|line| line.split(":"))
-        .flat_map(|mut id_and_games| {
-            match (
-                id_and_games
+        .map(|mut id_and_game| {
+            (
+                id_and_game
                     .next()
                     .map(|i| i.replace("Game ", "").trim().parse::<u32>()),
-                id_and_games.last(),
-            ) {
-                (Some(Ok(id)), Some(games)) => Ok((id, games)),
-                _ => Err(Errors::ParsingError),
-            }
+                id_and_game.last(),
+            )
+        })
+        .filter_map(|(id, games)| match (id, games) {
+            (Some(Ok(id)), Some(games)) => Some((id, games)),
+            _ => None,
         })
         .map(|(id, games)| (id, parse_row(games.to_string())))
         .map(|(id, games)| transform((id, games)))
@@ -56,19 +57,18 @@ where
 fn parse_row(games: String) -> Vec<Pull> {
     games
         .split(";")
-        .flat_map(|game| parse_pull(game.trim().to_string()))
+        .map(|game| parse_pull(game.trim().to_string()))
         .collect()
 }
 
-fn parse_pull(item: String) -> Result<Pull, Errors> {
-    Ok(item
-        .trim()
+fn parse_pull(item: String) -> Pull {
+    item.trim()
         .split(",")
         .map(|color| color.trim().split(" "))
-        .flat_map(
+        .filter_map(
             |mut color| match (color.next().map(|i| i.parse::<u32>()), color.last()) {
-                (Some(Ok(num)), Some(c)) => Ok((c, num)),
-                _ => Err(Errors::NoDigitFound),
+                (Some(Ok(num)), Some(c)) => Some((c, num)),
+                _ => None,
             },
         )
         .fold(
@@ -83,20 +83,13 @@ fn parse_pull(item: String) -> Result<Pull, Errors> {
                 "blue" => Pull { blue: num, ..acc },
                 _ => acc,
             },
-        ))
+        )
 }
 
 struct Pull {
     red: u32,
     green: u32,
     blue: u32,
-}
-
-#[derive(Debug)]
-enum Errors {
-    NoDigitFound,
-    FileError,
-    ParsingError,
 }
 
 #[cfg(test)]
