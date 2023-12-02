@@ -1,72 +1,102 @@
 use std::fs::read_to_string;
 
-pub fn solve_first() -> u32 {
-    let file = read_to_string("input").unwrap();
-    let red_limit = 12;
-    let green_limit = 13;
-    let blue_limit = 14;
-    let mut sum = 0;
-
-    'outer: for line in file.lines() {
-        let mut text = line.to_string();
-        text = text.replace("Game ", "");
-        let mut separated = text.split(":");
-        let id = separated.next().unwrap().parse::<u32>().unwrap();
-        let games = separated.last().unwrap().split(";");
-        for game in games {
-            let pulled = game.split(",");
-            for color in pulled {
-                let mut parsed = color.trim().split(" ");
-                let value = parsed.next().unwrap().parse::<u32>().unwrap();
-                let color = parsed.last().unwrap();
-                if color == "red" && value > red_limit {
-                    continue 'outer;
-                }
-                if color == "green" && value > green_limit {
-                    continue 'outer;
-                }
-                if color == "blue" && value > blue_limit {
-                    continue 'outer;
-                }
-            }
+fn solve_first() -> Result<u32, Errors> {
+    solve(|(id, games)| {
+        if games
+            .iter()
+            .all(|pull| pull.red <= 12 && pull.green <= 13 && pull.blue <= 14)
+        {
+            id
+        } else {
+            0
         }
-        sum += id;
-    }
-    sum
+    })
 }
 
-pub fn solve_second() -> u32 {
-    let file = read_to_string("input").unwrap();
-    let mut sum = 0;
-
-    for line in file.lines() {
-        let mut text = line.to_string();
-        text = text.replace("Game ", "");
-        let separated = text.split(":");
-        let games = separated.last().unwrap().split(";");
-        let mut max_red = 0;
-        let mut max_green = 0;
-        let mut max_blue = 0;
-        for game in games {
-            let pulled = game.split(",");
-            for color in pulled {
-                let mut parsed = color.trim().split(" ");
-                let value = parsed.next().unwrap().parse::<u32>().unwrap();
-                let color = parsed.last().unwrap();
-                if color == "red" && value > max_red {
-                    max_red = value;
-                }
-                if color == "green" && value > max_green {
-                    max_green = value;
-                }
-                if color == "blue" && value > max_blue {
-                    max_blue = value;
-                }
-            }
+fn solve_second() -> Result<u32, Errors> {
+    solve(|(_, games)| {
+        match (
+            games.iter().map(|pull| pull.red).max(),
+            games.iter().map(|pull| pull.green).max(),
+            games.iter().map(|pull| pull.blue).max(),
+        ) {
+            (Some(red), Some(green), Some(blue)) => red * green * blue,
+            _ => 0,
         }
-        sum += max_red * max_green * max_blue;
-    }
-    sum
+    })
+}
+
+fn solve<F>(transform: F) -> Result<u32, Errors>
+where
+    F: Fn((u32, Vec<Pull>)) -> u32,
+{
+    let file = read_to_string("input").map_err(|_| Errors::FileError)?;
+
+    Ok(file
+        .lines()
+        .into_iter()
+        .map(|line| line.split(":"))
+        .flat_map(|mut id_and_games| {
+            match (
+                id_and_games
+                    .next()
+                    .map(|i| i.replace("Game ", "").trim().parse::<u32>()),
+                id_and_games.last(),
+            ) {
+                (Some(Ok(id)), Some(games)) => Ok((id, games)),
+                _ => Err(Errors::ParsingError),
+            }
+        })
+        .map(|(id, games)| (id, parse_row(games.to_string())))
+        .map(|(id, games)| transform((id, games)))
+        .filter(|r| *r != 0)
+        .sum::<u32>())
+}
+
+fn parse_row(games: String) -> Vec<Pull> {
+    games
+        .split(";")
+        .flat_map(|game| parse_pull(game.trim().to_string()))
+        .collect()
+}
+
+fn parse_pull(item: String) -> Result<Pull, Errors> {
+    Ok(item
+        .trim()
+        .split(",")
+        .map(|color| color.trim().split(" "))
+        .flat_map(
+            |mut color| match (color.next().map(|i| i.parse::<u32>()), color.last()) {
+                (Some(Ok(num)), Some(c)) => Ok((c, num)),
+                _ => Err(Errors::NoDigitFound),
+            },
+        )
+        .fold(
+            Pull {
+                red: 0,
+                green: 0,
+                blue: 0,
+            },
+            |acc, (color, num)| match color.trim() {
+                "red" => Pull { red: num, ..acc },
+                "green" => Pull { green: num, ..acc },
+                "blue" => Pull { blue: num, ..acc },
+                _ => acc,
+            },
+        ))
+}
+
+struct Pull {
+    red: u32,
+    green: u32,
+    blue: u32,
+}
+
+#[derive(Debug)]
+enum Errors {
+    NoDigitFound,
+    FileError,
+    ParsingError,
 }
 
 #[cfg(test)]
@@ -76,12 +106,18 @@ mod tests {
     #[test]
     fn solve_1() {
         let result = solve_first();
-        assert_eq!(result, 2913);
+        match result {
+            Err(e) => panic!("{:?}", e),
+            Ok(result) => assert_eq!(result, 2913),
+        }
     }
 
     #[test]
     fn solve_2() {
         let result = solve_second();
-        assert_eq!(result, 55593);
+        match result {
+            Err(e) => panic!("{:?}", e),
+            Ok(result) => assert_eq!(result, 55593),
+        }
     }
 }
