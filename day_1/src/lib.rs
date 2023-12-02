@@ -42,19 +42,23 @@ mod tests {
 
     #[test]
     fn solve_1() {
+        let start = std::time::Instant::now();
         let result = solve_first();
         match result {
             Err(e) => panic!("{:?}", e),
             Ok(result) => assert_eq!(result, 55108),
         }
+        println!("solve_1: {:?}", start.elapsed().as_micros());
     }
 
     #[test]
     fn solve_2() {
+        let start = std::time::Instant::now();
         let result = solve_second();
         match result {
             Err(e) => panic!("{:?}", e),
             Ok(result) => assert_eq!(result, 56324),
         }
+        println!("solve_2: {:?}", start.elapsed().as_micros());
     }
 }

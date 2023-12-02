@@ -35,18 +35,15 @@ where
 
     Ok(file
         .lines()
-        .map(|line| line.split(":"))
-        .map(|mut id_and_game| {
-            (
-                id_and_game
-                    .next()
-                    .map(|i| i.replace("Game ", "").trim().parse::<u32>()),
-                id_and_game.last(),
-            )
-        })
-        .filter_map(|(id, games)| match (id, games) {
-            (Some(Ok(id)), Some(games)) => Some((id, games)),
-            _ => None,
+        .filter_map(|line| line.split_once(":"))
+        .filter_map(|id_and_game| {
+            id_and_game
+                .0
+                .replace("Game ", "")
+                .trim()
+                .parse::<u32>()
+                .ok()
+                .map(|id| (id, id_and_game.1))
         })
         .map(|(id, games)| (id, parse_row(games.to_string())))
         .map(|(id, games)| transform((id, games)))
@@ -64,13 +61,8 @@ fn parse_row(games: String) -> Vec<Pull> {
 fn parse_pull(item: String) -> Pull {
     item.trim()
         .split(",")
-        .map(|color| color.trim().split(" "))
-        .filter_map(
-            |mut color| match (color.next().map(|i| i.parse::<u32>()), color.last()) {
-                (Some(Ok(num)), Some(c)) => Some((c, num)),
-                _ => None,
-            },
-        )
+        .filter_map(|color| color.trim().split_once(" "))
+        .filter_map(|color| color.0.trim().parse::<u32>().ok().map(|i| (color.1, i)))
         .fold(
             Pull {
                 red: 0,
@@ -98,19 +90,23 @@ mod tests {
 
     #[test]
     fn solve_1() {
+        let start = std::time::Instant::now();
         let result = solve_first();
         match result {
             Err(e) => panic!("{:?}", e),
             Ok(result) => assert_eq!(result, 2913),
         }
+        println!("solve_1: {:?}", start.elapsed().as_micros());
     }
 
     #[test]
     fn solve_2() {
+        let start = std::time::Instant::now();
         let result = solve_second();
         match result {
             Err(e) => panic!("{:?}", e),
             Ok(result) => assert_eq!(result, 55593),
         }
+        println!("solve_2: {:?}", start.elapsed().as_micros());
     }
 }
